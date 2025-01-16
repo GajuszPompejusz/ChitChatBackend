@@ -1,0 +1,22 @@
+{
+    "name": "postgres-express-app",
+    "version": "1.0.0",
+    "description": "A simple Node.js and Express application connected to a PostgreSQL database.",
+    "main": "app.js",
+    "scripts": {
+        "start": "node app.js",
+        "dev": "nodemon app.js"
+    },
+    "author": "Your Name",
+    "license": "MIT",
+    "dependencies": {
+        "bcryptjs": "^2.4.3",
+        "dotenv": "^16.4.7",
+        "express": "^4.21.2",
+        "jsonwebtoken": "^9.0.2",
+        "pg": "^8.13.1"
+    },
+    "devDependencies": {
+        "nodemon": "^3.0.1"
+    }
+}
