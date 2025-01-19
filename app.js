@@ -174,10 +174,10 @@ app.use(express.static(path.join(__dirname)));
 //   }
 // });
 
-// //tabela rooms
-// app.get('/rooms_all', async (req, res) => {
+// //tabela room
+// app.get('/room_all', async (req, res) => {
 //   try {
-//     const result = await pool.query('SELECT * FROM rooms');
+//     const result = await pool.query('SELECT * FROM room');
 //     res.json(result.rows);
 //   } catch (error) {
 //     console.error('Error fetching data:', error.stack);
@@ -214,14 +214,14 @@ app.use(express.static(path.join(__dirname)));
 app.get('/session', async (req, res) => {
 
   if (req.session.userId == null) {
-    return res.status(401).json({ message: 'User is not logged in' });
+    return res.status(401).json({ error: 'User is not logged in' });
   }
 
   try {
-    res.status(200).json(req.session.userId);
+    res.status(200).json({userId: req.session.userId});
   } catch (error) {
     console.error('Error checking session:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
@@ -230,11 +230,11 @@ app.get('/profile', async (req, res) => {
   const { userId } = req.query;
 
   if (req.session.userId == null) {
-    return res.status(401).json({ message: 'User is not logged in' });
+    return res.status(401).json({ error: 'User is not logged in' });
   }
 
   if (!userId) {
-    return res.status(400).json({ message: 'User ID is missing' });
+    return res.status(400).json({ error: 'User ID is missing' });
   }
 
   try {
@@ -242,13 +242,13 @@ app.get('/profile', async (req, res) => {
 
     if (result.rows.length == 0)
     {
-      return res.status(400).json({ message: 'No user with such ID' });
+      return res.status(400).json({ error: 'No user with such ID' });
     }
 
     res.status(200).json(result.rows);
   } catch (error) {
     console.error('Error fetching user:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
@@ -257,11 +257,11 @@ app.get('/room', async (req, res) => {
   const { roomId } = req.query;
 
   if (req.session.userId == null) {
-    return res.status(401).json({ message: 'User is not logged in' });
+    return res.status(401).json({ error: 'User is not logged in' });
   }
 
   if (!roomId) {
-    return res.status(400).json({ message: 'Room ID is required' });
+    return res.status(400).json({ error: 'Room ID is required' });
   }
 
   try {
@@ -270,13 +270,18 @@ app.get('/room', async (req, res) => {
 
     if (resultOwner.rows.length == 0)
     {
-      return res.status(400).json({ message: 'This room does not exist' });
+      return res.status(400).json({ error: 'This room does not exist' });
     }
 
-    res.status(200).json( resultOwner.rows[0].owner, result.rows );
+    const users = result.rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+    }));
+
+    res.status(200).json( {ownerId: resultOwner.rows[0].owner ,users: users});
   } catch (error) {
     console.error('Error getting data of a room:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
@@ -284,20 +289,20 @@ app.get('/room', async (req, res) => {
 app.get('/rooms', async (req, res) => {
 
   if (req.session.userId == null) {
-    return res.status(401).json({ message: 'User is not logged in' });
+    return res.status(401).json({ error: 'User is not logged in' });
   }
 
   // if (!req.session.userId) {
-  //   return res.status(400).json({ message: 'User ID is missing' });
+  //   return res.status(400).json({ error: 'User ID is missing' });
   // }
 
   try {
-    const result = await pool.query('SELECT id, name FROM rooms INNER JOIN user_room on rooms.id = user_room.id_room WHERE user_room.id_user = $1', [req.session.userId]);
+    const result = await pool.query('SELECT id, name FROM room INNER JOIN user_room on room.id = user_room.id_room WHERE user_room.id_user = $1', [req.session.userId]);
 
-    res.status(200).json(result.rows);
+    res.status(200).json({Rooms: result.rows});
   } catch (error) {
     console.error('Error fetching rooms:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
@@ -306,24 +311,24 @@ app.get('/invite', async (req, res) => {
   const { roomId } = req.query;
 
   if (req.session.userId == null) {
-    return res.status(401).json({ message: 'User is not logged in' });
+    return res.status(401).json({ error: 'User is not logged in' });
   }
 
   if (!roomId) {
-    return res.status(400).json({ message: 'Room ID is missing' });
+    return res.status(400).json({ error: 'Room ID is missing' });
   }
 
   try {
-    const result = await pool.query('SELECT code FROM rooms WHERE id = $1', [roomId]);
+    const result = await pool.query('SELECT code FROM room WHERE id = $1', [roomId]);
 
     if (result.rows.length == 0){
-      return res.status(400).json({ message: 'This room does not exist' });
+      return res.status(400).json({ error: 'This room does not exist' });
     }
 
     res.status(200).json(result.rows[0].code);
   } catch (error) {
-    console.error('Error fetching rooms:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    console.error('Error getting room code:', error);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
@@ -332,24 +337,36 @@ app.get('/read', async (req, res) => {
   const { roomId, lastMessageId } = req.query;
 
   if (req.session.userId == null) {
-    return res.status(401).json({ message: 'User is not logged in' });
+    return res.status(401).json({ error: 'User is not logged in' });
   }
 
   if (!roomId) {
-    return res.status(400).json({ message: 'Room ID is missing' });
+    return res.status(400).json({ error: 'Room ID is missing' });
   }
 
   try {
+    let result;
     if (lastMessageId != null) {
-      const result = await pool.query('SELECT message.message, message.date, message.owner, users.name FROM message INNER JOIN users ON message.owner = users.id WHERE message.id_room = $1 AND message.id > $2', [roomId, lastMessageId]);
+      result = await pool.query('SELECT message.id, message.message, message.date, message.owner, users.name FROM message INNER JOIN users ON message.owner = users.id WHERE message.id_room = $1 AND message.id > $2', [roomId, lastMessageId]);
     } else {
-      const result = await pool.query('SELECT message.message, message.date, message.owner, users.name FROM message INNER JOIN users ON message.owner = users.id WHERE message.id_room = $1', [roomId]);
+      result = await pool.query('SELECT message.id, message.message, message.date, message.owner, users.name FROM message INNER JOIN users ON message.owner = users.id WHERE message.id_room = $1', [roomId]);
     }
 
-    res.status(200).json(result.rows);
+    const messages = result.rows.map((row) => ({
+      id: row.id,
+      date: row.date,
+      message: row.message,
+      owner: {
+        id: row.owner,
+        name: row.name,
+      },
+    }));
+
+
+    res.status(200).json({messages: messages});
   } catch (error) {
     console.error('Error fetching messages:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
@@ -362,28 +379,28 @@ app.post('/login', async (req, res) => {
   const { login, password } = req.body;
 
   if (!login || !password) {
-    return res.status(400).json({ message: 'Missing login or password' });
+    return res.status(400).json({ error: 'Missing login or password' });
   }
 
   try {
     const result = await pool.query('SELECT * FROM users WHERE login = $1', [login]);
 
     if (result.rows.length === 0) {
-      return res.status(400).json({ message: 'Incorrect login' });
+      return res.status(400).json({ error: 'Incorrect login' });
     }
 
     const user = result.rows[0];
     const isPasswordValid = await password.localeCompare(user.password);
 
     if (isPasswordValid) {
-      return res.status(400).json({ message: 'Incorrect password' });
+      return res.status(400).json({ error: 'Incorrect password' });
     }
 
     req.session.userId = user.id;
-    res.status(200).json({ message: 'Login successful' });
+    res.status(200).json({ userId: user.id });
   } catch (error) {
     console.error('Error during login:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
@@ -392,18 +409,18 @@ app.post('/register', async (req, res) => {
   const { login, password } = req.body;
 
   if (!login || !password) {
-    return res.status(400).json({ message: 'Missing login or password' });
+    return res.status(400).json({ error: 'Missing login or password' });
   }
 
   if (password.length < 8) {
-    return res.status(400).json({ message: 'Password must be at least 8 characters long' });
+    return res.status(400).json({ error: 'Password must be at least 8 characters long' });
   }
 
   try {
     const result = await pool.query('SELECT * FROM users WHERE login = $1', [login]);
 
     if (result.rows.length > 0) {
-      return res.status(400).json({ message: 'Login already in use' });
+      return res.status(400).json({ error: 'Login already in use' });
     }
 
     const currUsers = await pool.query('SELECT MAX(id) FROM users')
@@ -413,10 +430,10 @@ app.post('/register', async (req, res) => {
     await pool.query('INSERT INTO users (id, name, password) VALUES ($1, $2, $3)', [newId, login, password]);
 
     req.session.userId = newId;
-    res.status(200).json({ message: 'User registered successfully' });
+    res.status(200).json({ userId: newId });
   } catch (error) {
     console.error('Error during sign-up:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
@@ -425,11 +442,11 @@ app.post('/room', async (req, res) => {
   const { name } = req.body;
 
   if (req.session.userId == null) {
-    return res.status(401).json({ message: 'User is not logged in' });
+    return res.status(401).json({ error: 'User is not logged in' });
   }
 
   if (!name) {
-    return res.status(400).json({ message: 'Missing name' });
+    return res.status(400).json({ error: 'Missing name' });
   }
   const length = 8;
   const characters = 'abcdefghijklmnopqrstuvwxyz0123456789';
@@ -448,10 +465,10 @@ app.post('/room', async (req, res) => {
     await pool.query('INSERT INTO room (id, name, code, owner) VALUES ($1, $2, $3, $4)', [newId, name, code, req.session.userId]);
     await pool.query('INSERT INTO user_room (id_user, id_room) VALUES ($1, $2)', [req.session.userId, newId]);
 
-    res.status(200).json({ message: 'Room created' });
+    res.status(200).json({ roomId: newId });
   } catch (error) {
     console.error('Could not create room:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
@@ -460,22 +477,22 @@ app.post('/invite', async (req, res) => {
   const { roomId } = req.body;
 
   if (req.session.userId == null) {
-    return res.status(401).json({ message: 'User is not logged in' });
+    return res.status(401).json({ error: 'User is not logged in' });
   }
 
   if (!roomId) {
-    return res.status(400).json({ message: 'Room ID missing' });
+    return res.status(400).json({ error: 'Room ID missing' });
   }
 
   try {
     const result = await pool.query('SELECT code FROM room WHERE id = $1', [roomId]);
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ message: 'Room not found' });
+      return res.status(400).json({ error: 'Room not found' });
     }
 
     if (result.rows[0].owner != req.session.userId) {
-      return res.status(400).json({ message: 'Not owner of the room' });
+      return res.status(400).json({ error: 'Not owner of the room' });
     }
 
     const length = 8;
@@ -489,10 +506,10 @@ app.post('/invite', async (req, res) => {
 
     pool.query( 'UPDATE room SET code = $1 WHERE id = $2', [code, roomId])
 
-    res.status(200).json({ code });
+    res.status(200).json({ code: code });
   } catch (error) {
     console.error('Error retrieving room code:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
@@ -501,27 +518,27 @@ app.post('/join', async (req, res) => {
   const { code } = req.body;
 
   if (req.session.userId == null) {
-    return res.status(401).json({ message: 'User is not logged in' });
+    return res.status(401).json({ error: 'User is not logged in' });
   }
 
   if (!code) {
-    return res.status(400).json({ message: 'Room code missing' });
+    return res.status(400).json({ error: 'Room code missing' });
   }
 
   try { 
     const roomResult = await pool.query('SELECT id FROM room WHERE code = $1', [code])
 
     if (roomResult.rows.length == 0) {
-      return res.status(400).json({ message: 'Incorrect room code' });
+      return res.status(400).json({ error: 'Incorrect room code' });
     }
 
     const roomId = roomResult.rows[0].id;
     await pool.query('INSERT INTO user_room (id_user, id_room) VALUES ($1, $2)', [req.session.userId, room_id]);
 
-    res.status(200).json({ roomId });
+    res.status(200).json({ roomId: roomId });
   } catch (error) {
     console.error('Error during joining a room:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
@@ -530,17 +547,17 @@ app.post('/send', async (req, res) => {
   const { roomId, message } = req.body;
 
   if (req.session.userId == null) {
-    return res.status(401).json({ message: 'User is not logged in' });
+    return res.status(401).json({ error: 'User is not logged in' });
   }
 
   if (!roomId || !message) {
-    return res.status(400).json({ message: 'Invalid data' });
+    return res.status(400).json({ error: 'Invalid data' });
   }
 
   const result = await pool.query('SELECT * FROM user_room WHERE id_user = $1 AND id_room = $2', [req.session.userId, roomId])
   if (result.rows.length == 0)
   {
-    return res.status(400).json({ message: 'User not in the room' });
+    return res.status(400).json({ error: 'User not in the room' });
   }
 
   try {
@@ -553,15 +570,20 @@ app.post('/send', async (req, res) => {
 
     const newMessageInfo = await pool.query('SELECT message.id, message.date, message.message, message.owner, users.name FROM message INNER JOIN users ON users.id = message.owner WHERE message.id = $1', [newId]);
 
-    const id = newMessageInfo.rows[0].id;
-    const date = newMessageInfo.rows[0].date;
-    const message = newMessageInfo.rows[0].message;
-    const owner = newMessageInfo.rows[0].owner;
-    const name = newMessageInfo.rows[0].name;
-    res.status(202).json({ id, date, message, owner, name });
+    const messageNew = newMessageInfo.rows.map((row) => ({
+      id: row.id,
+      date: row.date,
+      message: row.message,
+      owner: {
+        id: row.owner,
+        name: row.name,
+      },
+    }));
+
+    res.status(202).json({ messageNew });
   } catch (error) {
-    console.error('Nie udało się wysłać wiadomości:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    console.error('Could not send the message:', error);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
@@ -570,28 +592,28 @@ app.post('/send', async (req, res) => {
 //metody PUT
 
 //edycja profilu
-app.put('/editprofile', async (req, res) => {
+app.put('/profile', async (req, res) => {
   const { name, description } = req.body;
 
   if (req.session.userId == null) {
-    return res.status(401).json({ message: 'User is not logged in' });
+    return res.status(401).json({ error: 'User is not logged in' });
   }
 
    if (!name) {
-     return res.status(400).json({ message: 'Must have a name' });
+     return res.status(400).json({ error: 'Must have a name' });
    }
 
   try {
     const result = await pool.query( 'UPDATE users SET name = $1, description = $2 WHERE id = $3 RETURNING *', [name, description, req.session.userId]);
 
     if (result.rowCount === 0) {
-      return res.status(404).json({ message: 'No user with such ID' });
+      return res.status(400).json({ error: 'No user with such ID' });
     }
 
-    res.status(200).json({ message: 'User updated', user: result.rows[0] });
+    res.status(200).json({ name: name, description: description });
   } catch (error) {
     console.error('Error during user update:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
