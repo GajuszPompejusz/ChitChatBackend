@@ -309,7 +309,7 @@ app.get('/rooms', async (req, res) => {
   try {
     const result = await pool.query('SELECT id, name FROM room INNER JOIN user_room on room.id = user_room.id_room WHERE user_room.id_user = $1', [req.session.userId]);
 
-    return res.status(200).json({Rooms: result.rows});
+    return res.status(200).json({rooms: result.rows});
   } catch (error) {
     console.error('Error fetching rooms:', error);
     res.status(500).json({ error: 'Server error' });
@@ -615,7 +615,7 @@ app.post('/send', async (req, res) => {
       },
     }));
 
-    return res.status(200).json({ messageNew });
+    return res.status(200).json( messageNew[0] );
   } catch (error) {
     console.error('Could not send the message:', error);
     res.status(500).json({ error: 'Server error' });
