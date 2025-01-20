@@ -77,7 +77,7 @@ const poolDefault = new Pool({
           name varchar(32) COLLATE pg_catalog."default" NOT NULL,
           login varchar(24) COLLATE pg_catalog."default" NOT NULL,
           password varchar(32) COLLATE pg_catalog."default" NOT NULL,
-          description varchar(255) COLLATE pg_catalog."default" DEFAULT 'desc.'::text,
+          description varchar(255) COLLATE pg_catalog."default" DEFAULT,
           CONSTRAINT users_pkey PRIMARY KEY (id),
           CONSTRAINT users_id_login_key UNIQUE (id, login)
       );
@@ -254,7 +254,7 @@ app.get('/profile', async  (req, res) => {
       return res.status(400).json({ error: 'No user with such ID' });
     }
 
-    return res.status(200).json(result.rows);
+    return res.status(200).json(result.rows[0]);
   } catch (error) {
     console.error('Error fetching user:', error);
     res.status(500).json({ error: 'Server error' });
