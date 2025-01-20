@@ -225,9 +225,10 @@ app.get('/session', async (req, res) => {
     return res.status(401).json({ error: 'User is not logged in' });
   }
   try {
-    
+    const result = await pool.query('SELECT name FROM users WHERE id = $1', [req.session.userId]);
+    const name = result.rows[0].name;
     const userId = req.session.userId;
-    return res.status(200).json({userId: userId});
+    return res.status(200).json({userId: userId, name: name});
   } catch (error) {
     console.error('Error checking session:', error);
     res.status(500).json({ error: 'Server error' });
@@ -264,7 +265,6 @@ app.get('/profile', async  (req, res) => {
 //Dane pokoju (lista użytkowników)
 app.get('/room', async (req, res) => {
   const { roomId } = req.query;
-  console.log(req.session);
   if (req.session.userId == null) {
     return res.status(401).json({ error: 'User is not logged in' });
   }
@@ -297,7 +297,6 @@ app.get('/room', async (req, res) => {
 //Lista pokoi użytkownika
 app.get('/rooms', async (req, res) => {
 
-  console.log(req.session);
   if (req.session.userId == null) {
     return res.status(401).json({ error: 'User is not logged in' });
   }
@@ -380,6 +379,28 @@ app.get('/read', async (req, res) => {
   }
 });
 
+//Wylogowywanie
+app.get('/logout', async (req, res) => {
+
+  if (req.session.userId == null) {
+    return res.status(401).json({ error: 'User is already logged out' });
+  }
+  try {
+    
+    req.session.userId = null;
+    req.session.save(async(err) => {
+      if (err) {
+        console.error('Session save error:', err);
+        return res.status(500).json({ error: 'Session save failed' });
+      } 
+      return res.status(200).json();
+    });
+  } catch (error) {
+    console.error('Error checking session:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 
 
 //metody POST
@@ -406,23 +427,13 @@ app.post('/login', async (req, res) => {
       return res.status(400).json({ error: 'Incorrect password' });
     }
 
-
-    console.log('Before setting session:', req.session);
-
-    req.session.userId = 123; // Example assignment
-    console.log('After setting session:', req.session);
-
-
     req.session.userId = user.id;
-    console.log('Correct session ID:', req.session);
     req.session.save(async(err) => {
       if (err) {
         console.error('Session save error:', err);
         return res.status(500).json({ error: 'Session save failed' });
       } 
-      console.log('Correct session ID2:', req.session);
-      return res.status(200).json({ userId: user.id });
-      
+      return res.status(200).json({ userId: user.id, name: user.name});
     });
   } catch (error) {
     console.error('Error during login:', error);
@@ -462,8 +473,7 @@ app.post('/register', async (req, res) => {
         console.error('Session save error:', err);
         return res.status(500).json({ error: 'Session save failed' });
       } 
-      console.log('Correct session ID2:', req.session);
-      return res.status(200).json({ userId: newId });
+      return res.status(200).json({ userId: newId, name: name});
       
     });
   } catch (error) {
@@ -475,7 +485,6 @@ app.post('/register', async (req, res) => {
 // Tworzenie pokoju
 app.post('/room', async (req, res) => {
   const { name } = req.body;
-  console.log(req.session);
   if (req.session.userId == null) {
     return res.status(401).json({ error: 'User is not logged in' });
   }
@@ -568,7 +577,7 @@ app.post('/join', async (req, res) => {
     }
 
     const roomId = roomResult.rows[0].id;
-    await pool.query('INSERT INTO user_room (id_user, id_room) VALUES ($1, $2)', [req.session.userId, room_id]);
+    await pool.query('INSERT INTO user_room (id_user, id_room) VALUES ($1, $2)', [req.session.userId, roomId]);
 
     return res.status(200).json({ roomId: roomId });
   } catch (error) {
