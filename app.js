@@ -456,7 +456,16 @@ app.post('/register', async (req, res) => {
     await pool.query('INSERT INTO users (id, name, login, password) VALUES ($1, $2, $3, $4)', [newId, name, login, password]);
 
     req.session.userId = newId;
-    return res.status(200).json({ userId: newId });
+
+    req.session.save(async(err) => {
+      if (err) {
+        console.error('Session save error:', err);
+        return res.status(500).json({ error: 'Session save failed' });
+      } 
+      console.log('Correct session ID2:', req.session);
+      return res.status(200).json({ userId: newId });
+      
+    });
   } catch (error) {
     console.error('Error during sign-up:', error);
     res.status(500).json({ error: 'Server error' });
