@@ -5,11 +5,19 @@ const jwt = require('jsonwebtoken');
 const { Pool } = require('pg');
 const dotenv = require('dotenv');
 const cors = require('cors');
+const session = require('express-session');
 
 dotenv.config();
 const app = express();
 const port = 3001;
 app.use(express.json());
+
+app.use(session({
+  secret: 'your-secret-key', 
+  resave: false, 
+  saveUninitialized: false, 
+  cookie: { secure: false } 
+}));
 
 // Konfiguracja CORS
 const corsOptions = {
@@ -216,9 +224,10 @@ app.get('/session', async (req, res) => {
   if (req.session.userId == null) {
     return res.status(401).json({ error: 'User is not logged in' });
   }
-
   try {
-    res.status(200).json({userId: req.session.userId});
+    
+    const userId = req.session.userId;
+    return res.status(200).json({userId: userId});
   } catch (error) {
     console.error('Error checking session:', error);
     res.status(500).json({ error: 'Server error' });
@@ -226,7 +235,7 @@ app.get('/session', async (req, res) => {
 });
 
 //Dane profilu
-app.get('/profile', async (req, res) => {
+app.get('/profile', async  (req, res) => {
   const { userId } = req.query;
 
   if (req.session.userId == null) {
@@ -245,7 +254,7 @@ app.get('/profile', async (req, res) => {
       return res.status(400).json({ error: 'No user with such ID' });
     }
 
-    res.status(200).json(result.rows);
+    return res.status(200).json(result.rows);
   } catch (error) {
     console.error('Error fetching user:', error);
     res.status(500).json({ error: 'Server error' });
@@ -255,7 +264,7 @@ app.get('/profile', async (req, res) => {
 //Dane pokoju (lista użytkowników)
 app.get('/room', async (req, res) => {
   const { roomId } = req.query;
-
+  console.log(req.session);
   if (req.session.userId == null) {
     return res.status(401).json({ error: 'User is not logged in' });
   }
@@ -278,7 +287,7 @@ app.get('/room', async (req, res) => {
       name: row.name,
     }));
 
-    res.status(200).json( {ownerId: resultOwner.rows[0].owner ,users: users});
+    return res.status(200).json( {ownerId: resultOwner.rows[0].owner ,users: users});
   } catch (error) {
     console.error('Error getting data of a room:', error);
     res.status(500).json({ error: 'Server error' });
@@ -288,6 +297,7 @@ app.get('/room', async (req, res) => {
 //Lista pokoi użytkownika
 app.get('/rooms', async (req, res) => {
 
+  console.log(req.session);
   if (req.session.userId == null) {
     return res.status(401).json({ error: 'User is not logged in' });
   }
@@ -299,7 +309,7 @@ app.get('/rooms', async (req, res) => {
   try {
     const result = await pool.query('SELECT id, name FROM room INNER JOIN user_room on room.id = user_room.id_room WHERE user_room.id_user = $1', [req.session.userId]);
 
-    res.status(200).json({Rooms: result.rows});
+    return res.status(200).json({Rooms: result.rows});
   } catch (error) {
     console.error('Error fetching rooms:', error);
     res.status(500).json({ error: 'Server error' });
@@ -325,7 +335,7 @@ app.get('/invite', async (req, res) => {
       return res.status(400).json({ error: 'This room does not exist' });
     }
 
-    res.status(200).json(result.rows[0].code);
+    return res.status(200).json(result.rows[0].code);
   } catch (error) {
     console.error('Error getting room code:', error);
     res.status(500).json({ error: 'Server error' });
@@ -363,7 +373,7 @@ app.get('/read', async (req, res) => {
     }));
 
 
-    res.status(200).json({messages: messages});
+    return res.status(200).json({messages: messages});
   } catch (error) {
     console.error('Error fetching messages:', error);
     res.status(500).json({ error: 'Server error' });
@@ -390,14 +400,30 @@ app.post('/login', async (req, res) => {
     }
 
     const user = result.rows[0];
-    const isPasswordValid = await password.localeCompare(user.password);
+    const isPasswordValid = password === user.password;
 
-    if (isPasswordValid) {
+    if (!isPasswordValid) {
       return res.status(400).json({ error: 'Incorrect password' });
     }
 
+
+    console.log('Before setting session:', req.session);
+
+    req.session.userId = 123; // Example assignment
+    console.log('After setting session:', req.session);
+
+
     req.session.userId = user.id;
-    res.status(200).json({ userId: user.id });
+    console.log('Correct session ID:', req.session);
+    req.session.save(async(err) => {
+      if (err) {
+        console.error('Session save error:', err);
+        return res.status(500).json({ error: 'Session save failed' });
+      } 
+      console.log('Correct session ID2:', req.session);
+      return res.status(200).json({ userId: user.id });
+      
+    });
   } catch (error) {
     console.error('Error during login:', error);
     res.status(500).json({ error: 'Server error' });
@@ -406,9 +432,9 @@ app.post('/login', async (req, res) => {
 
 // Rejestracja
 app.post('/register', async (req, res) => {
-  const { login, password } = req.body;
+  const { name, login, password } = req.body;
 
-  if (!login || !password) {
+  if (!name || !login || !password) {
     return res.status(400).json({ error: 'Missing login or password' });
   }
 
@@ -427,10 +453,10 @@ app.post('/register', async (req, res) => {
     const maxId = currUsers.rows[0].max; 
     const newId = maxId !== null ? maxId + 1 : 1;
    
-    await pool.query('INSERT INTO users (id, name, password) VALUES ($1, $2, $3)', [newId, login, password]);
+    await pool.query('INSERT INTO users (id, name, login, password) VALUES ($1, $2, $3, $4)', [newId, name, login, password]);
 
     req.session.userId = newId;
-    res.status(200).json({ userId: newId });
+    return res.status(200).json({ userId: newId });
   } catch (error) {
     console.error('Error during sign-up:', error);
     res.status(500).json({ error: 'Server error' });
@@ -440,7 +466,7 @@ app.post('/register', async (req, res) => {
 // Tworzenie pokoju
 app.post('/room', async (req, res) => {
   const { name } = req.body;
-
+  console.log(req.session);
   if (req.session.userId == null) {
     return res.status(401).json({ error: 'User is not logged in' });
   }
@@ -465,7 +491,7 @@ app.post('/room', async (req, res) => {
     await pool.query('INSERT INTO room (id, name, code, owner) VALUES ($1, $2, $3, $4)', [newId, name, code, req.session.userId]);
     await pool.query('INSERT INTO user_room (id_user, id_room) VALUES ($1, $2)', [req.session.userId, newId]);
 
-    res.status(200).json({ roomId: newId });
+    return res.status(200).json({ roomId: newId });
   } catch (error) {
     console.error('Could not create room:', error);
     res.status(500).json({ error: 'Server error' });
@@ -506,7 +532,7 @@ app.post('/invite', async (req, res) => {
 
     pool.query( 'UPDATE room SET code = $1 WHERE id = $2', [code, roomId])
 
-    res.status(200).json({ code: code });
+    return res.status(200).json({ code: code });
   } catch (error) {
     console.error('Error retrieving room code:', error);
     res.status(500).json({ error: 'Server error' });
@@ -535,7 +561,7 @@ app.post('/join', async (req, res) => {
     const roomId = roomResult.rows[0].id;
     await pool.query('INSERT INTO user_room (id_user, id_room) VALUES ($1, $2)', [req.session.userId, room_id]);
 
-    res.status(200).json({ roomId: roomId });
+    return res.status(200).json({ roomId: roomId });
   } catch (error) {
     console.error('Error during joining a room:', error);
     res.status(500).json({ error: 'Server error' });
@@ -580,7 +606,7 @@ app.post('/send', async (req, res) => {
       },
     }));
 
-    res.status(202).json({ messageNew });
+    return res.status(200).json({ messageNew });
   } catch (error) {
     console.error('Could not send the message:', error);
     res.status(500).json({ error: 'Server error' });
@@ -610,7 +636,7 @@ app.put('/profile', async (req, res) => {
       return res.status(400).json({ error: 'No user with such ID' });
     }
 
-    res.status(200).json({ name: name, description: description });
+    return res.status(200).json({ name: name, description: description });
   } catch (error) {
     console.error('Error during user update:', error);
     res.status(500).json({ error: 'Server error' });
