@@ -335,7 +335,7 @@ app.get('/invite', async (req, res) => {
       return res.status(400).json({ error: 'This room does not exist' });
     }
 
-    return res.status(200).json(result.rows[0].code);
+    return res.status(200).json({code: result.rows[0].code});
   } catch (error) {
     console.error('Error getting room code:', error);
     res.status(500).json({ error: 'Server error' });
@@ -520,7 +520,7 @@ app.post('/invite', async (req, res) => {
   }
 
   try {
-    const result = await pool.query('SELECT code FROM room WHERE id = $1', [roomId]);
+    const result = await pool.query('SELECT code, owner FROM room WHERE id = $1', [roomId]);
 
     if (result.rows.length === 0) {
       return res.status(400).json({ error: 'Room not found' });
