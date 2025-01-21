@@ -44,13 +44,12 @@ const poolDefault = new Pool({
   try {
     console.log('Connecting to PostgreSQL...');
     
-    // Check connection
+    // Łączenie z bazą
     await poolDefault.connect();
 
-    // Database name
-    const dbName = 'ChitChat'; // Replace with your desired database name
+    // Nazwa pożądanej bazy danych
+    const dbName = 'ChitChat';
 
-    // Check if the database already exists
     const checkDbQuery = `
       SELECT 1 FROM pg_database WHERE datname = $1
     `;
@@ -58,7 +57,7 @@ const poolDefault = new Pool({
     
     if (result.rows.length === 0) {
       
-      // Database does not exist, create it
+      // Tworzenie bazy danych jeśli nie istnieje
       const createDbQuery = `CREATE DATABASE ${dbName}`;
       await poolDefault.query(createDbQuery);
       console.log(`Database '${dbName}' created successfully.`);
@@ -142,7 +141,6 @@ const poolDefault = new Pool({
   } catch (error) {
     console.error('Error creating the database:', error.message);
   } finally {
-    // Close the connection
     await poolDefault.end();
     console.log('Disconnected from PostgreSQL.');
   }
