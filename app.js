@@ -1,5 +1,5 @@
 const express = require('express');
-//const bcrypt = require('bcryptjs');
+const bcrypt = require('bcryptjs');
 const path = require('path');
 const jwt = require('jsonwebtoken');
 const { Pool } = require('pg');
@@ -39,6 +39,7 @@ const poolDefault = new Pool({
 });
 
 
+
 (async () => {
   try {
     console.log('Connecting to PostgreSQL...');
@@ -76,7 +77,7 @@ const poolDefault = new Pool({
           id integer NOT NULL,
           name varchar(32) COLLATE pg_catalog."default" NOT NULL,
           login varchar(24) COLLATE pg_catalog."default" NOT NULL,
-          password varchar(32) COLLATE pg_catalog."default" NOT NULL,
+          password text COLLATE pg_catalog."default" NOT NULL,
           description varchar(255) COLLATE pg_catalog."default" DEFAULT,
           CONSTRAINT users_pkey PRIMARY KEY (id),
           CONSTRAINT users_id_login_key UNIQUE (id, login)
@@ -247,6 +248,14 @@ app.get('/profile', async  (req, res) => {
     return res.status(400).json({ error: 'User ID is missing' });
   }
 
+  const usersSameRoom = await pool.query(`SELECT id_room FROM user_room WHERE id_user = $1 and id_room in (
+  SELECT id_room FROM user_room WHERE id_user = $2)`, [userId, req.session.userId]);
+
+  if (usersSameRoom.rows.length == 0)
+  {
+    return res.status(400).json({ error: 'Users are not connected' });
+  }
+
   try {
     const result = await pool.query('SELECT name, description FROM users WHERE id = $1', [userId]);
 
@@ -327,6 +336,13 @@ app.get('/invite', async (req, res) => {
     return res.status(400).json({ error: 'Room ID is missing' });
   }
 
+  const isInRoom = await pool.query('SELECT * FROM user_room WHERE id_user = $1 AND id_room = $2', [req.session.userId, roomId])
+
+  if (isInRoom.rows.length == 0)
+  {
+    return res.status(400).json({ error: 'User not in the room' });
+  }
+
   try {
     const result = await pool.query('SELECT code FROM room WHERE id = $1', [roomId]);
 
@@ -353,7 +369,15 @@ app.get('/read', async (req, res) => {
     return res.status(400).json({ error: 'Room ID is missing' });
   }
 
+  const isInRoom = await pool.query('SELECT * FROM user_room WHERE id_user = $1 AND id_room = $2', [req.session.userId, roomId])
+
+  if (isInRoom.rows.length == 0)
+  {
+    return res.status(400).json({ error: 'User not in the room' });
+  }
+
   try {
+
     let result;
     if (lastMessageId != null) {
       result = await pool.query('SELECT message.id, message.message, message.date, message.owner, users.name FROM message INNER JOIN users ON message.owner = users.id WHERE message.id_room = $1 AND message.id > $2', [roomId, lastMessageId]);
@@ -421,7 +445,7 @@ app.post('/login', async (req, res) => {
     }
 
     const user = result.rows[0];
-    const isPasswordValid = password === user.password;
+    const isPasswordValid = await bcrypt.compare(password, user.password);
 
     if (!isPasswordValid) {
       return res.status(400).json({ error: 'Incorrect password' });
@@ -454,6 +478,9 @@ app.post('/register', async (req, res) => {
   }
 
   try {
+    const saltRounds = 10;
+    const passwordHashed = await bcrypt.hash(password, saltRounds);
+
     const result = await pool.query('SELECT * FROM users WHERE login = $1', [login]);
 
     if (result.rows.length > 0) {
@@ -463,8 +490,9 @@ app.post('/register', async (req, res) => {
     const currUsers = await pool.query('SELECT MAX(id) FROM users')
     const maxId = currUsers.rows[0].max; 
     const newId = maxId !== null ? maxId + 1 : 1;
-   
-    await pool.query('INSERT INTO users (id, name, login, password) VALUES ($1, $2, $3, $4)', [newId, name, login, password]);
+    const newDesc = '';
+
+    await pool.query('INSERT INTO users (id, name, login, password, description) VALUES ($1, $2, $3, $4, $5)', [newId, name, login, passwordHashed, newDesc]);
 
     req.session.userId = newId;
 
