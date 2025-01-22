@@ -1,11 +1,11 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const path = require('path');
-const jwt = require('jsonwebtoken');
 const { Pool } = require('pg');
 const dotenv = require('dotenv');
 const cors = require('cors');
 const session = require('express-session');
+
 
 dotenv.config();
 const app = express();
@@ -29,7 +29,7 @@ const corsOptions = {
 // Użycie middleware CORS
 app.use(cors(corsOptions));
 
-// pool dla PostgreSQL
+// pool dla serwera PostgreSQL
 const poolDefault = new Pool({
   host: process.env.DB_HOST,
   port: process.env.DB_PORT,
@@ -131,9 +131,6 @@ const poolDefault = new Pool({
       `);
       console.log('Tables created successfully');
 
-      // //I may put some inserts here, maybe
-      // await pool.query(`
-      //   `)
 
     } else {
       console.log(`Database '${dbName}' already exists.`);
@@ -167,52 +164,6 @@ pool.connect((err, client, release) => {
 app.use(express.static(path.join(__dirname)));
 
 
-
-//metody GET dla całych tabel
-
-// //tabela users
-// app.get('/users_all', async (req, res) => {
-//   try {
-//     const result = await pool.query('SELECT * FROM users');
-//     res.json(result.rows);
-//   } catch (error) {
-//     console.error('Error fetching data:', error.stack);
-//     res.status(500).send('Internal Server Error');
-//   }
-// });
-
-// //tabela room
-// app.get('/room_all', async (req, res) => {
-//   try {
-//     const result = await pool.query('SELECT * FROM room');
-//     res.json(result.rows);
-//   } catch (error) {
-//     console.error('Error fetching data:', error.stack);
-//     res.status(500).send('Internal Server Error');
-//   }
-// });
-
-// //tabela user_room
-// app.get('/user_room_all', async (req, res) => {
-//   try {
-//     const result = await pool.query('SELECT * FROM user_room');
-//     res.json(result.rows);
-//   } catch (error) {
-//     console.error('Error fetching data:', error.stack);
-//     res.status(500).send('Internal Server Error');
-//   }
-// });
-
-// //tabela message
-// app.get('/message_all', async (req, res) => {
-//   try {
-//     const result = await pool.query('SELECT * FROM message');
-//     res.json(result.rows);
-//   } catch (error) {
-//     console.error('Error fetching data:', error.stack);
-//     res.status(500).send('Internal Server Error');
-//   }
-// });
 
 
 //metody GET
