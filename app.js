@@ -369,7 +369,7 @@ app.get('/logout', async (req, res) => {
       return res.status(200).json();
     });
   } catch (error) {
-    console.error('Error checking session:', error);
+    console.error('Error while logging out:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });
