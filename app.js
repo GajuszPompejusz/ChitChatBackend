@@ -419,7 +419,7 @@ app.post('/register', async (req, res) => {
   const { name, login, password } = req.body;
 
   if (!name || !login || !password) {
-    return res.status(400).json({ error: 'Missing login or password' });
+    return res.status(400).json({ error: 'Missing name, login or password' });
   }
 
   if (password.length < 8) {
